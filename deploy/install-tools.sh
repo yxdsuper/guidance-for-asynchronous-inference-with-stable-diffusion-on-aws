@@ -95,8 +95,8 @@ if which node > /dev/null
     download "https://nodejs.org/dist/v{$node_version}/node-v{$node_version}-linux-x64.tar.xz" "node.tar.xz"
     sudo mkdir -p /usr/local/lib/nodejs
     sudo tar -xJf node.tar.xz -C /usr/local/lib/nodejs
-    export PATH="/usr/local/lib/nodejs/node-v{$node_version}-linux-x64/bin:$PATH"
-    printf "export PATH=\"/usr/local/lib/nodejs/node-v{$node_version}-linux-x64/bin:\$PATH\"" >> ~/.bash_profile
+    export PATH="/usr/local/lib/nodejs/node-v${node_version}-linux-x64/bin:$PATH"
+    printf "export PATH=\"/usr/local/lib/nodejs/node-v${node_version}-linux-x64/bin:\$PATH\"" >> ~/.bash_profile
     source ~/.bash_profile
 fi
 
@@ -106,7 +106,7 @@ if which cdk > /dev/null
     printf "CDK CLI is installed, skipping...\n"
   else
     printf "Installing AWS CDK CLI and bootstraping CDK environment...\n"
-    sudo npm install -g aws-cdk@$cdk_version
+    sudo install -g aws-cdk@$cdk_version
 fi
 
 printf "Tools install complete. \n"

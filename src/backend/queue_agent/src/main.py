@@ -80,8 +80,6 @@ def fetch_progress(api_base_url, task_id):
         pass
 
 
-
-
 def main():
     # Initialization:
     # 1. Environment parameters;
