@@ -70,6 +70,7 @@ SQS_WAIT_TIME_SECONDS = 20
 # For graceful shutdown
 shutdown = False
 
+
 def main():
     # Initialization:
     # 1. Environment parameters;
@@ -102,7 +103,7 @@ def main():
         received_messages = sqs_action.receive_messages(queue, 1, SQS_WAIT_TIME_SECONDS)
 
         for message in received_messages:
-            with xray_recorder.in_segment(runtime_name+"-queue-agent") as segment:
+            with xray_recorder.in_segment(runtime_name + "-queue-agent") as segment:
                 # Retrieve x-ray trace header from SQS message
                 if "AWSTraceHeader" in message.attributes.keys():
                     traceHeaderStr = message.attributes['AWSTraceHeader']
@@ -148,6 +149,8 @@ def main():
                 response = {}
 
                 if runtime_type == "sdwebui":
+                    # 开启一个线程监听进度
+
                     response = sdwebui.handler(api_base_url, tasktype, task_id, body, dynamic_sd_model)
 
                 if runtime_type == "comfyui":
@@ -161,9 +164,11 @@ def main():
                     if len(response["image"]) > 0:
                         for i in response["image"]:
                             idx += 1
-                            result.append(s3_action.upload_file(i, s3_bucket, prefix, str(task_id)+"-"+rand+"-"+str(idx)))
+                            result.append(
+                                s3_action.upload_file(i, s3_bucket, prefix, str(task_id) + "-" + rand + "-" + str(idx)))
 
-                output_url = s3_action.upload_file(response["content"], s3_bucket, prefix, str(task_id)+"-"+rand, ".out")
+                output_url = s3_action.upload_file(response["content"], s3_bucket, prefix, str(task_id) + "-" + rand,
+                                                   ".out")
 
                 sns_response = {'id': task_id,
                                 'result': response["success"],
@@ -175,6 +180,7 @@ def main():
                 sns_action.publish_message(topic, json.dumps(sns_response))
                 sqs_action.delete_message(message)
 
+
 def print_env() -> None:
     logger.info(f'AWS_DEFAULT_REGION={aws_default_region}')
     logger.info(f'SQS_QUEUE_URL={sqs_queue_url}')
@@ -183,9 +189,11 @@ def print_env() -> None:
     logger.info(f'RUNTIME_TYPE={runtime_type}')
     logger.info(f'RUNTIME_NAME={runtime_name}')
 
+
 def signalHandler(signum, frame):
     global shutdown
     shutdown = True
+
 
 if __name__ == '__main__':
     for sig in [signal.SIGINT, signal.SIGHUP, signal.SIGTERM]:

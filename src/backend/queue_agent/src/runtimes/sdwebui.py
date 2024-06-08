@@ -12,11 +12,11 @@ from aws_xray_sdk.core import xray_recorder
 from jsonpath_ng import parse
 from modules import http_action, misc
 
-
 logger = logging.getLogger("queue-agent")
 
 ALWAYSON_SCRIPTS_EXCLUDE_KEYS = ['task', 'id_task', 'uid',
                                  'sd_model_checkpoint', 'image_link', 'save_dir', 'sd_vae', 'override_settings']
+
 
 def check_readiness(api_base_url: str, dynamic_sd_model: bool) -> bool:
     """Check if SD Web UI is ready by invoking /option endpoint"""
@@ -40,6 +40,7 @@ def check_readiness(api_base_url: str, dynamic_sd_model: bool) -> bool:
             logger.debug(repr(e))
             time.sleep(1)
     return True
+
 
 def handler(api_base_url: str, task_type: str, task_id: str, payload: dict, dynamic_sd_model: bool) -> dict:
     """Main handler for SD Web UI request"""
@@ -83,6 +84,20 @@ def handler(api_base_url: str, task_type: str, task_id: str, payload: dict, dyna
                 task_response = invoke_extra_single_image(api_base_url, payload)
             case 'extra-batch-image':
                 task_response = invoke_extra_batch_images(api_base_url, payload)
+            case 'interrogate':
+                task_response = invoke_interrogate(api_base_url, payload)
+                response["success"] = True
+                response["content"] = json.dumps(task_response)
+                return response
+            case 'interrupt':
+                invoke_interrupt(api_base_url)
+                response["success"] = True
+                return response
+            case 'progress':
+                task_response = invoke_progress(api_base_url)
+                response["success"] = True
+                response["content"] = json.dumps(task_response)
+                return response
             case _:
                 # Catch all
                 logger.error(f'Unsupported task type: {task_type}, ignoring')
@@ -109,6 +124,7 @@ def handler(api_base_url: str, task_type: str, task_id: str, payload: dict, dyna
         response["content"] = content
     return response
 
+
 @xray_recorder.capture('text-to-image')
 def invoke_txt2img(api_base_url: str, body) -> str:
     # Compatiability for v1alpha1: Move override_settings from header to body
@@ -127,8 +143,21 @@ def invoke_txt2img(api_base_url: str, body) -> str:
     # Process image link in elsewhere in body
     body = download_image(body)
 
-    response = http_action.do_invocations(api_base_url+"txt2img", body)
+    response = http_action.do_invocations(api_base_url + "txt2img", body)
     return response
+
+
+@xray_recorder.capture('progress')
+def invoke_progress(api_base_url: str) -> str:
+    response = http_action.do_invocations(api_base_url + "progress")
+    return response
+
+
+@xray_recorder.capture('interrogate')
+def invoke_interrogate(api_base_url: str, payload) -> str:
+    response = http_action.do_invocations(api_base_url + "interrogate", payload)
+    return response
+
 
 @xray_recorder.capture('image-to-image')
 def invoke_img2img(api_base_url: str, body: dict) -> str:
@@ -154,42 +183,49 @@ def invoke_img2img(api_base_url: str, body: dict) -> str:
     # Compatiability for v1alpha1: Remove header used for routing in v1alpha1 API request
     body.update({'alwayson_scripts': misc.exclude_keys(body['alwayson_scripts'], ALWAYSON_SCRIPTS_EXCLUDE_KEYS)})
 
-    response = http_action.do_invocations(api_base_url+"img2img", body)
+    response = http_action.do_invocations(api_base_url + "img2img", body)
     return response
+
 
 @xray_recorder.capture('extra-single-image')
 def invoke_extra_single_image(api_base_url: str, body) -> str:
-
     body = download_image(body)
 
-    response = http_action.do_invocations(api_base_url+"extra-single-image", body)
+    response = http_action.do_invocations(api_base_url + "extra-single-image", body)
     return response
+
 
 @xray_recorder.capture('extra-batch-images')
 def invoke_extra_batch_images(api_base_url: str, body) -> str:
-
     body = download_image(body)
 
-    response = http_action.do_invocations(api_base_url+"extra-batch-images", body)
+    response = http_action.do_invocations(api_base_url + "extra-batch-images", body)
     return response
 
+
 def invoke_set_options(api_base_url: str, options: dict) -> str:
-    return http_action.do_invocations(api_base_url+"options", options)
+    return http_action.do_invocations(api_base_url + "options", options)
+
 
 def invoke_get_options(api_base_url: str) -> str:
-    return http_action.do_invocations(api_base_url+"options")
+    return http_action.do_invocations(api_base_url + "options")
+
 
 def invoke_get_model_names(api_base_url: str) -> str:
-    return sorted([x["title"] for x in http_action.do_invocations(api_base_url+"sd-models")])
+    return sorted([x["title"] for x in http_action.do_invocations(api_base_url + "sd-models")])
+
 
 def invoke_refresh_checkpoints(api_base_url: str) -> str:
-    return http_action.do_invocations(api_base_url+"refresh-checkpoints", {})
+    return http_action.do_invocations(api_base_url + "refresh-checkpoints", {})
+
 
 def invoke_unload_checkpoints(api_base_url: str) -> str:
-    return http_action.do_invocations(api_base_url+"unload-checkpoint", {})
+    return http_action.do_invocations(api_base_url + "unload-checkpoint", {})
+
 
 def invoke_interrupt(api_base_url: str) -> str:
-    return http_action.do_invocations(api_base_url+"interrupt", {})
+    return http_action.do_invocations(api_base_url + "interrupt", {})
+
 
 def switch_model(api_base_url: str, name: str) -> str:
     opts = invoke_get_options(api_base_url)
@@ -213,16 +249,17 @@ def switch_model(api_base_url: str, name: str) -> str:
 
     return current_model_name
 
+
 # Customizable for success responses
 def succeed(task_id, response):
     parameters = {}
-    if 'parameters' in response: # text-to-image and image-to-image
+    if 'parameters' in response:  # text-to-image and image-to-image
         parameters = response['parameters']
         parameters['id_task'] = task_id
         parameters['image_seed'] = ','.join(
             str(x) for x in json.loads(response['info'])['all_seeds'])
         parameters['error_msg'] = ''
-    elif 'html_info' in response: # extra-single-image and extra-batch-images
+    elif 'html_info' in response:  # extra-single-image and extra-batch-images
         parameters['html_info'] = response['html_info']
         parameters['id_task'] = task_id
         parameters['error_msg'] = ''
@@ -246,6 +283,7 @@ def failed(task_id, exception):
         'info': ''
     }
 
+
 def download_image(body: dict) -> dict:
     """Search URL in object, and replace all URL with content of URL"""
     jsonpath_expr = parse('$..*')
@@ -264,6 +302,7 @@ def download_image(body: dict) -> dict:
                 print(f"Error fetching URL: {value}")
                 print(f"Error: {str(e)}")
     return body
+
 
 def post_invocations(response):
     img_bytes = []
