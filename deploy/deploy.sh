@@ -86,21 +86,21 @@ QUEUE_AGENT_IMAGE=public.ecr.aws/bingjiao/sd-on-eks/queue-agent:latest
 
 # Step 1: Install tools
 
-printf "Step 1: Install tools... \n"
-if [ ${INSTALL_TOOLS} = true ] ; then
-  "${SCRIPTPATH}"/install-tools.sh
-fi
-
-# Step 2: Create S3 bucket and upload model
-
-printf "Step 2: Create S3 bucket and upload SD 1.5 model... \n"
-if [ -z "${MODEL_BUCKET}" ] ; then
-  MODEL_BUCKET="${STACK_NAME}"-model-bucket-$(echo ${RANDOM} | md5sum | head -c 4)
-  aws s3 mb "s3://${MODEL_BUCKET}" --region "${AWS_DEFAULT_REGION}"
-  "${SCRIPTPATH}"/upload-model.sh "${MODEL_BUCKET}"
-else
-  printf "Existing bucket detected, skipping... \n"
-fi
+#printf "Step 1: Install tools... \n"
+#if [ ${INSTALL_TOOLS} = true ] ; then
+#  "${SCRIPTPATH}"/install-tools.sh
+#fi
+#
+## Step 2: Create S3 bucket and upload model
+#
+#printf "Step 2: Create S3 bucket and upload SD 1.5 model... \n"
+#if [ -z "${MODEL_BUCKET}" ] ; then
+#  MODEL_BUCKET="${STACK_NAME}"-model-bucket-$(echo ${RANDOM} | md5sum | head -c 4)
+#  aws s3 mb "s3://${MODEL_BUCKET}" --region "${AWS_DEFAULT_REGION}"
+#  "${SCRIPTPATH}"/upload-model.sh "${MODEL_BUCKET}"
+#else
+#  printf "Existing bucket detected, skipping... \n"
+#fi
 
 # Step 3: Create EBS Snapshot
 
