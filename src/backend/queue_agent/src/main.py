@@ -1,12 +1,13 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-
+import concurrent
 import json
 import logging
 import os
 import signal
 import sys
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 
 import boto3
 from aws_xray_sdk.core import patch_all, xray_recorder
@@ -71,6 +72,16 @@ SQS_WAIT_TIME_SECONDS = 20
 shutdown = False
 
 
+def fetch_progress(api_base_url, task_id):
+    result = sdwebui.handler(api_base_url, 'progress', task_id, {}, dynamic_sd_model)
+    if result['success']:
+        # pwd
+        # todo
+        pass
+
+
+
+
 def main():
     # Initialization:
     # 1. Environment parameters;
@@ -86,6 +97,9 @@ def main():
 
     if runtime_type == "comfyui":
         comfyui.check_readiness(api_base_url)
+
+    # 创建线程池
+    executor = ThreadPoolExecutor(max_workers=1)
 
     # main loop
     # 1. Pull msg from sqs;
@@ -150,7 +164,7 @@ def main():
 
                 if runtime_type == "sdwebui":
                     # 开启一个线程监听进度
-
+                    executor.submit(fetch_progress, api_base_url, task_id)
                     response = sdwebui.handler(api_base_url, tasktype, task_id, body, dynamic_sd_model)
 
                 if runtime_type == "comfyui":
@@ -179,6 +193,8 @@ def main():
                 # Put response handler to SNS and delete message
                 sns_action.publish_message(topic, json.dumps(sns_response))
                 sqs_action.delete_message(message)
+
+    executor.shutdown()
 
 
 def print_env() -> None:
